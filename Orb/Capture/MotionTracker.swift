@@ -1,0 +1,81 @@
+import CoreMotion
+import Foundation
+import PanoCore
+
+/// Device attitude from Core Motion as a device-to-world rotation (world Z up, X arbitrary but
+/// fixed while running), with a short history so a photo can be matched to the attitude at the
+/// instant it was exposed.
+final class MotionTracker: @unchecked Sendable {
+    struct Sample {
+        let time: TimeInterval      // seconds since boot, same clock as AVCapturePhoto.timestamp
+        let rotation: Mat3          // device -> world
+        let rate: Double            // angular speed, rad/s
+    }
+
+    private let manager = CMMotionManager()
+    private let queue: OperationQueue = {
+        let q = OperationQueue()
+        q.maxConcurrentOperationCount = 1
+        q.qualityOfService = .userInteractive
+        return q
+    }()
+    private let lock = NSLock()
+    private var samples: [Sample] = []
+    /// Whether CMQuaternion maps world to device rather than device to world. Settled from the
+    /// first tilted sample by checking which reading reproduces the measured gravity.
+    private var transposed: Bool?
+
+    var isAvailable: Bool { manager.isDeviceMotionAvailable }
+
+    func start(hz: Double = 100) {
+        guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
+        manager.deviceMotionUpdateInterval = 1 / hz
+        let frames = CMMotionManager.availableAttitudeReferenceFrames()
+        let frame: CMAttitudeReferenceFrame = frames.contains(.xArbitraryCorrectedZVertical)
+            ? .xArbitraryCorrectedZVertical : .xArbitraryZVertical
+        manager.startDeviceMotionUpdates(using: frame, to: queue) { [weak self] motion, _ in
+            if let motion { self?.record(motion) }
+        }
+    }
+
+    func stop() {
+        manager.stopDeviceMotionUpdates()
+        lock.lock(); samples.removeAll(); lock.unlock()
+    }
+
+    var latest: Sample? {
+        lock.lock(); defer { lock.unlock() }
+        return samples.last
+    }
+
+    /// Attitude at `time`, interpolated between the bracketing samples; nil if outside the history.
+    func rotation(at time: TimeInterval) -> Mat3? {
+        lock.lock(); defer { lock.unlock() }
+        guard let first = samples.first, let last = samples.last,
+              time >= first.time - 0.02, time <= last.time + 0.05 else { return nil }
+        guard let k = samples.firstIndex(where: { $0.time >= time }) else { return last.rotation }
+        if k == 0 { return samples[0].rotation }
+        let a = samples[k - 1], b = samples[k]
+        let t = (time - a.time) / max(1e-6, b.time - a.time)
+        let delta = (b.rotation * a.rotation.transposed).axisAngle
+        return (Mat3.rotation(delta * t) * a.rotation).orthonormalized
+    }
+
+    private func record(_ m: CMDeviceMotion) {
+        let q = m.attitude.quaternion
+        let raw = Mat3.fromQuaternion(w: q.w, x: q.x, y: q.y, z: q.z)
+        lock.lock(); defer { lock.unlock() }
+        if transposed == nil {
+            let g = Vec3(m.gravity.x, m.gravity.y, m.gravity.z)
+            let down = Vec3(0, 0, -1)
+            let errAsIs = (raw.transposed * down - g).length
+            let errTransposed = (raw * down - g).length
+            if abs(errAsIs - errTransposed) > 0.3 { transposed = errTransposed < errAsIs }
+        }
+        let r = m.rotationRate
+        samples.append(Sample(time: m.timestamp,
+                              rotation: transposed == true ? raw.transposed : raw,
+                              rate: sqrt(r.x * r.x + r.y * r.y + r.z * r.z)))
+        if samples.count > 400 { samples.removeFirst(samples.count - 300) }
+    }
+}

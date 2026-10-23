@@ -1,0 +1,32 @@
+name: build
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    container: swift:6.1-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: PanoCore tests
+        working-directory: Packages/PanoCore
+        run: swift test -c release -Xswiftc -enable-testing
+
+  ios-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate project
+        run: brew install xcodegen && xcodegen
+      - name: Build (unsigned)
+        run: |
+          xcodebuild -project Orb.xcodeproj -scheme Orb -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Package unsigned IPA (for AltStore / SideStore)
+        run: |
+          mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/Orb.app Payload/
+          zip -qry Orb-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orb-unsigned-ipa
+          path: Orb-unsigned.ipa
