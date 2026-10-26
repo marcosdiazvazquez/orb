@@ -20,11 +20,11 @@ struct PanoramaInfo: Codable, Hashable {
     var date: Date
 }
 
-/// The most accurate GPS fix seen during a capture.
+/// Where a capture was taken: the accuracy-weighted average of its best GPS fixes.
 struct CaptureLocation: Codable, Hashable {
     var latitude: Double
     var longitude: Double
-    /// Radius of uncertainty, metres.
+    /// Radius of uncertainty of the best single fix, metres.
     var accuracy: Double
 }
 

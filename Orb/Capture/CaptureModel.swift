@@ -34,6 +34,7 @@ final class CaptureModel {
     var shortFOV: Double { 2 * atan(tan(longFOV / 2) / aspect) }
     var isComplete: Bool { !targets.isEmpty && done.count == targets.count }
     var session: AVCaptureSession { camera.session }
+    var gps: LocationTracker.Status { location.status }
 
     let id = UUID()
     private let directory: URL
@@ -69,6 +70,7 @@ final class CaptureModel {
         // Before the camera starts, so the auto-shutter can't fire behind the prompt. If the
         // user says no, the panorama just has no coordinates.
         await location.requestAccess()
+        location.start()  // now rather than with the camera: GPS gets every second to settle
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let info = try await camera.configure(lens: requested)
@@ -79,7 +81,6 @@ final class CaptureModel {
             targets = ShotPlan(shortFOV: shortFOV, overlap: density.overlap).targets
             camera.start()
             motion.start()
-            location.start()
             UIApplication.shared.isIdleTimerDisabled = true
             haptics.prepare()
             phase = .aiming

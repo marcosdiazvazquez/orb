@@ -111,9 +111,10 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 - **Stitching.** The library shows progress, and a panorama appears in a few seconds.
 - **Details** (⋯ › Details) shows alignment RMS. Under about 0.1° is good; several degrees
   means the matching failed.
-- **Location.** The first capture asks for location before the camera starts. Details shows the
-  GPS fix with its accuracy, or "Not recorded" if location was denied, Precise Location is off,
-  or there was no fix (common indoors).
+- **Location.** The first capture asks for location before the camera starts (and for precise
+  location, whenever it's off). The capture screen shows "GPS ±N m" under the shot counter,
+  usually settling to a few metres outdoors. Details shows the final position, or "Not
+  recorded" if location was denied or approximate, or there was no fix (common indoors).
 - **Report back.** Nate wants a raw capture folder for tuning: Files › On My iPhone › Orb ›
   Captures › `<uuid>`, which holds `capture.json`, `shot-NN.heic` and `pano.jpg`.
 
@@ -128,8 +129,8 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   - Tests render a procedural sphere through simulated cameras, corrupt the rotations and focal
     length, and check that stitching recovers them.
 - `Orb/Capture/`: `CameraController` (AVFoundation, photo output, exposure lock),
-  `MotionTracker` (Core Motion attitude history), `LocationTracker` (Core Location, the most
-  accurate fix during a capture), `CaptureModel` (target logic and auto-shutter), `CaptureView`
+  `MotionTracker` (Core Motion attitude history), `LocationTracker` (Core Location, an
+  accuracy-weighted average of the best fixes during a capture), `CaptureModel` (target logic and auto-shutter), `CaptureView`
   (preview, overlay, controls).
 - `Orb/Stitch/`: `StitchService` (a queue, off the main thread), `StitchJob` (decode, stitch,
   write `pano.jpg`, `planet.jpg`, `thumb.jpg`), `ImageCodec` (ImageIO, Display P3, GPano XMP,

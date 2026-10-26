@@ -33,6 +33,8 @@ targets:
         NSCameraUsageDescription: Orb takes the photos that it stitches into 360° panoramas.
         NSPhotoLibraryAddUsageDescription: Orb saves your 360° panoramas to Photos.
         NSLocationWhenInUseUsageDescription: Orb tags each panorama with where it was taken.
+        NSLocationTemporaryUsageDescriptionDictionary:
+          Capture: Orb needs your precise location to tag this panorama with where it was taken.
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

@@ -57,11 +57,14 @@ struct CaptureView: View {
                 }
                 .background(.ultraThinMaterial, in: Circle())
                 Spacer()
-                if !model.targets.isEmpty {
-                    Text("\(model.done.count) / \(model.targets.count)")
-                        .font(.headline.monospacedDigit())
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
+                VStack(spacing: 6) {
+                    if !model.targets.isEmpty {
+                        Text("\(model.done.count) / \(model.targets.count)")
+                            .font(.headline.monospacedDigit())
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    if model.phase == .aiming { gpsLabel }
                 }
                 Spacer()
                 Button { model.undoLast() } label: {
@@ -108,6 +111,19 @@ struct CaptureView: View {
             }
         }
         .padding(.vertical, 12)
+    }
+
+    /// Live GPS accuracy, so the photographer can see whether the fix is good before leaving.
+    private var gpsLabel: some View {
+        let (text, symbol): (String, String) = switch model.gps {
+        case .off: ("No location", "location.slash")
+        case .searching: ("Finding GPS…", "location")
+        case .fix(let accuracy): (String(format: "GPS ±%.0f m", accuracy), "location.fill")
+        }
+        return Label(text, systemImage: symbol)
+            .font(.caption.monospacedDigit())
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.ultraThinMaterial, in: Capsule())
     }
 
     private var hint: String {

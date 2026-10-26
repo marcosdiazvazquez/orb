@@ -54,11 +54,13 @@ AltServer-Linux port runs on Linux).
   PanoCore and writes the outputs. `Viewer/` is the Metal panorama viewer. `Library/` holds the
   capture store and the screens.
 
-Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (the most
-accurate GPS fix seen while capturing, and per shot: file name and device-to-world rotation),
-`shot-NN.heic`, and after stitching `pano.jpg` (equirectangular, 2:1, GPano XMP, EXIF GPS and
-capture time), `planet.jpg` and `thumb.jpg`. Details (⋯ › Details) shows the GPS fix and its
-accuracy, so you can check it before leaving the spot.
+Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (the GPS
+position, and per shot: file name and device-to-world rotation), `shot-NN.heic`, and after
+stitching `pano.jpg` (equirectangular, 2:1, GPano XMP, EXIF GPS and capture time), `planet.jpg`
+and `thumb.jpg`. The GPS position averages the fixes from the whole capture, weighted by their
+accuracy, keeping only those within 1.5× of the best. The capture screen shows the live
+accuracy, and Details (⋯ › Details) the final position, so you can check it before leaving the
+spot.
 
 ## Tips for clean stitches
 
@@ -66,3 +68,10 @@ accuracy, so you can check it before leaving the spot.
   phone at arm's length is what ruins seams on nearby objects.
 - Keep exposure locked (the default) unless the scene has both very bright and very dark parts.
 - Use dense overlap for plain walls, close interiors, or scenes with people moving.
+
+## Tips for accurate GPS
+
+- Shoot outdoors with open sky; buildings, trees, and indoors make GPS worse.
+- Keep Precise Location on for Orb. If it's off, Orb asks to turn it on for the session.
+- Watch the GPS label on the capture screen. If it still reads more than about ±10 m at the end,
+  stay put a little longer, or capture again.
