@@ -3,8 +3,10 @@
 Orb is an iPhone app for 360° photos: guided capture, on-device stitching, a 360° viewer, and
 export. Nate (ncb@udel.edu) wrote it with Claude Code on Linux, which has no Xcode.
 
-- **Tested:** the stitching core, `Packages/PanoCore` (Linux, `swift test`).
-- **Never compiled:** the app target, `Orb/`.
+- **Tested:** the stitching core, `Packages/PanoCore` (Linux, `swift test`; also passes on macOS
+  with Xcode 27.1).
+- **Compiles, never run on a phone:** the app target, `Orb/`. The unsigned Release build in
+  section 3 succeeds with Xcode 27.1, with no code changes.
 
 If you are running on a Mac for a teammate, your job is almost certainly: **get Orb compiling, then
 installed on an iPhone, with as few changes as possible, and report what you changed.**
@@ -14,7 +16,12 @@ installed on an iPhone, with as few changes as possible, and report what you cha
 ```sh
 xcodebuild -version          # needs Xcode 16 or newer
 xcodegen --version || brew install xcodegen
+xcrun -f metal || xcodebuild -downloadComponent MetalToolchain   # a separate download since Xcode 26
 ```
+
+If `xcode-select -p` points at the Command Line Tools, prefix the commands with
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (no sudo needed), or ask the human to
+run `sudo xcode-select -s /Applications/Xcode.app`.
 
 ## 2. Run the core tests (fast, no signing)
 
