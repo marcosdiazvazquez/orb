@@ -6,15 +6,15 @@ stitching, viewing and sharing. It has no account, no server and no paywall.
 
 ## Features
 
-| Teleport: 360° Camera                                                     | Orb                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Guided capture, 16 ultra-wide shots                                       | Guided capture laid out from the lens's real field of view: 15 ultra-wide shots (7 around the horizon, 4 up, 4 down), or about 44 with the 1× lens. The shutter fires by itself when the reticle sits still on a dot. |
-| Upside-down capture                                                       | Any roll works, the nadir included. The shot plan assumes only the frame's inscribed circle.                                                                                                                          |
-| On-device stitching                                                       | Sensor attitude, then coarse-to-fine overlap matching and rotation bundle adjustment (focal length refined too), then exposure-gain compensation, feathered equirectangular blending, and filling of any holes.       |
-| Pro mode                                                                  | Settings: lens, overlap (standard or dense), exposure lock, output 4K/6K/8K. Any capture can be re-stitched later at another size.                                                                                    |
-| 360° viewer                                                               | A Metal viewer: drag, pinch, fling, gyro look-around, and a little-planet mode (double-tap) that morphs smoothly from the normal view.                                                                                |
-| Save to Photos, share                                                     | Saves to Photos or shares the JPEG with GPano XMP, so Google Photos, Facebook and other 360° viewers open it as a sphere. Also shares a little-planet image. Originals are in Files › On My iPhone › Orb.             |
-| Community feed, accounts, Street View upload, Vision Pro app, 3D "splats" | Not built. These need a server or third-party services.                                                                                                                                                               |
+| Teleport: 360° Camera                                                     | Orb                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guided capture, 16 ultra-wide shots                                       | Guided capture laid out from the lens's real field of view: 15 ultra-wide shots (7 around the horizon, 4 up, 4 down), or about 44 with the 1× lens. The shutter fires by itself when the reticle sits still on a dot.                                                                                |
+| Upside-down capture                                                       | Any roll works, the nadir included. The shot plan assumes only the frame's inscribed circle.                                                                                                                                                                                                         |
+| On-device stitching                                                       | Sensor attitude, then coarse-to-fine overlap matching and rotation bundle adjustment (focal length refined too), then exposure-gain compensation, feathered equirectangular blending, and filling of any holes.                                                                                      |
+| Pro mode                                                                  | Settings: lens, overlap (standard or dense), exposure lock, output 4K/6K/8K. Any capture can be re-stitched later at another size.                                                                                                                                                                   |
+| 360° viewer                                                               | A Metal viewer: drag, pinch, fling, gyro look-around, and a little-planet mode (double-tap) that morphs smoothly from the normal view.                                                                                                                                                               |
+| Save to Photos, share                                                     | Saves to Photos or shares the JPEG with GPano XMP, so Google Photos, Facebook and other 360° viewers open it as a sphere. Like a camera photo, it carries the capture time and, if location is allowed, GPS in EXIF. Also shares a little-planet image. Originals are in Files › On My iPhone › Orb. |
+| Community feed, accounts, Street View upload, Vision Pro app, 3D "splats" | Not built. These need a server or third-party services.                                                                                                                                                                                                                                              |
 
 ## Build and run
 
@@ -54,9 +54,11 @@ AltServer-Linux port runs on Linux).
   PanoCore and writes the outputs. `Viewer/` is the Metal panorama viewer. `Library/` holds the
   capture store and the screens.
 
-Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (per shot:
-file name and device-to-world rotation), `shot-NN.heic`, and after stitching `pano.jpg`
-(equirectangular, 2:1, GPano XMP), `planet.jpg` and `thumb.jpg`.
+Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (the most
+accurate GPS fix seen while capturing, and per shot: file name and device-to-world rotation),
+`shot-NN.heic`, and after stitching `pano.jpg` (equirectangular, 2:1, GPano XMP, EXIF GPS and
+capture time), `planet.jpg` and `thumb.jpg`. Details (⋯ › Details) shows the GPS fix and its
+accuracy, so you can check it before leaving the spot.
 
 ## Tips for clean stitches
 

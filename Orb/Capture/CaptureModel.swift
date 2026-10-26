@@ -39,6 +39,7 @@ final class CaptureModel {
     private let directory: URL
     private let camera = CameraController()
     private let motion = MotionTracker()
+    private let location = LocationTracker()
     private var lens: Lens = .ultraWide
     private var lockExposure = true
     private var timer: Timer?
@@ -65,6 +66,9 @@ final class CaptureModel {
             phase = .failed("This device has no gyroscope, which guided capture needs.")
             return
         }
+        // Before the camera starts, so the auto-shutter can't fire behind the prompt. If the
+        // user says no, the panorama just has no coordinates.
+        await location.requestAccess()
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let info = try await camera.configure(lens: requested)
@@ -75,6 +79,7 @@ final class CaptureModel {
             targets = ShotPlan(shortFOV: shortFOV, overlap: density.overlap).targets
             camera.start()
             motion.start()
+            location.start()
             UIApplication.shared.isIdleTimerDisabled = true
             haptics.prepare()
             phase = .aiming
@@ -94,6 +99,7 @@ final class CaptureModel {
         timer = nil
         camera.stop()
         motion.stop()
+        location.stop()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -103,8 +109,8 @@ final class CaptureModel {
     }
 
     func makeRecord() -> CaptureRecord {
-        CaptureRecord(id: id, date: Date(), lens: lens, longFOV: longFOV, plannedShots: targets.count,
-                      shots: shots, panorama: nil, stitchError: nil)
+        CaptureRecord(id: id, date: Date(), location: location.best, lens: lens, longFOV: longFOV,
+                      plannedShots: targets.count, shots: shots, panorama: nil, stitchError: nil)
     }
 
     func undoLast() {

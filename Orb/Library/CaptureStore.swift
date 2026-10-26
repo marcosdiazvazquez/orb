@@ -20,11 +20,21 @@ struct PanoramaInfo: Codable, Hashable {
     var date: Date
 }
 
+/// The most accurate GPS fix seen during a capture.
+struct CaptureLocation: Codable, Hashable {
+    var latitude: Double
+    var longitude: Double
+    /// Radius of uncertainty, metres.
+    var accuracy: Double
+}
+
 /// One capture: its shots, and the panorama once stitched. Saved as `capture.json` in the
 /// capture's folder next to the shot files, `pano.jpg`, `planet.jpg` and `thumb.jpg`.
 struct CaptureRecord: Codable, Hashable, Identifiable {
     var id: UUID
     var date: Date
+    /// Where it was taken, if the phone had a precise fix.
+    var location: CaptureLocation?
     var lens: Lens
     /// Field of view across the photos' long side, radians.
     var longFOV: Double

@@ -123,6 +123,9 @@ private struct InfoSheet: View {
                 LabeledContent("Captured", value: record.date.formatted(date: .long, time: .shortened))
                 LabeledContent("Shots", value: "\(record.shots.count) of \(record.plannedShots)")
                 LabeledContent("Lens", value: "\(record.lens.label), \(Int((record.longFOV * 180 / .pi).rounded()))°")
+                LabeledContent("Location", value: record.location.map {
+                    String(format: "%.5f, %.5f (±%.0f m)", $0.latitude, $0.longitude, $0.accuracy)
+                } ?? "Not recorded")
                 if let p = record.panorama {
                     LabeledContent("Panorama", value: "\(p.width) × \(p.height)")
                     LabeledContent("Stitch time", value: String(format: "%.1f s", p.seconds))

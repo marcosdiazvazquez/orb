@@ -59,12 +59,16 @@ enum ImageCodec {
     }
 
     /// Writes a JPEG. With `equirectangular`, adds Google's GPano XMP so Google Photos,
-    /// Facebook and other 360° viewers open it as a sphere.
-    static func writeJPEG(_ image: RGBAImage, to url: URL, quality: Double, equirectangular: Bool = false) throws {
+    /// Facebook and other 360° viewers open it as a sphere. `location` and `date` become EXIF
+    /// GPS and capture time, as a camera writes them.
+    static func writeJPEG(_ image: RGBAImage, to url: URL, quality: Double, equirectangular: Bool = false,
+                          location: CaptureLocation? = nil, date: Date? = nil) throws {
         guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
             throw ImageCodecError.unwritable(url.lastPathComponent)
         }
-        let props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+        var props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+        if let location { props[kCGImagePropertyGPSDictionary] = gpsProperties(location) }
+        if let date { props[kCGImagePropertyExifDictionary] = exifDateProperties(date) }
         let cg = cgImage(image)
         if equirectangular {
             CGImageDestinationAddImageAndMetadata(dest, cg, panoramaMetadata(width: image.width, height: image.height),
@@ -73,6 +77,27 @@ enum ImageCodec {
             CGImageDestinationAddImage(dest, cg, props as CFDictionary)
         }
         guard CGImageDestinationFinalize(dest) else { throw ImageCodecError.unwritable(url.lastPathComponent) }
+    }
+
+    static func gpsProperties(_ location: CaptureLocation) -> [CFString: Any] {
+        [
+            kCGImagePropertyGPSLatitude: abs(location.latitude),
+            kCGImagePropertyGPSLatitudeRef: location.latitude >= 0 ? "N" : "S",
+            kCGImagePropertyGPSLongitude: abs(location.longitude),
+            kCGImagePropertyGPSLongitudeRef: location.longitude >= 0 ? "E" : "W",
+            kCGImagePropertyGPSHPositioningError: location.accuracy,
+        ]
+    }
+
+    /// Capture time as EXIF writes it: local wall-clock time, plus its UTC offset.
+    static func exifDateProperties(_ date: Date) -> [CFString: Any] {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.timeZone = .current
+        format.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        let time = format.string(from: date)
+        format.dateFormat = "xxx"  // -04:00
+        return [kCGImagePropertyExifDateTimeOriginal: time, kCGImagePropertyExifOffsetTimeOriginal: format.string(from: date)]
     }
 
     /// Photo Sphere XMP (https://developers.google.com/streetview/spherical-metadata).

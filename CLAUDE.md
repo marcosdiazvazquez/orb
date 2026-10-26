@@ -111,6 +111,9 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 - **Stitching.** The library shows progress, and a panorama appears in a few seconds.
 - **Details** (⋯ › Details) shows alignment RMS. Under about 0.1° is good; several degrees
   means the matching failed.
+- **Location.** The first capture asks for location before the camera starts. Details shows the
+  GPS fix with its accuracy, or "Not recorded" if location was denied, Precise Location is off,
+  or there was no fix (common indoors).
 - **Report back.** Nate wants a raw capture folder for tuning: Files › On My iPhone › Orb ›
   Captures › `<uuid>`, which holds `capture.json`, `shot-NN.heic` and `pano.jpg`.
 
@@ -125,10 +128,12 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   - Tests render a procedural sphere through simulated cameras, corrupt the rotations and focal
     length, and check that stitching recovers them.
 - `Orb/Capture/`: `CameraController` (AVFoundation, photo output, exposure lock),
-  `MotionTracker` (Core Motion attitude history), `CaptureModel` (target logic and
-  auto-shutter), `CaptureView` (preview, overlay, controls).
+  `MotionTracker` (Core Motion attitude history), `LocationTracker` (Core Location, the most
+  accurate fix during a capture), `CaptureModel` (target logic and auto-shutter), `CaptureView`
+  (preview, overlay, controls).
 - `Orb/Stitch/`: `StitchService` (a queue, off the main thread), `StitchJob` (decode, stitch,
-  write `pano.jpg`, `planet.jpg`, `thumb.jpg`), `ImageCodec` (ImageIO, Display P3, GPano XMP).
+  write `pano.jpg`, `planet.jpg`, `thumb.jpg`), `ImageCodec` (ImageIO, Display P3, GPano XMP,
+  EXIF GPS and capture time).
 - `Orb/Viewer/`: `PanoViewer` (MTKView, gestures, gyro) and `Pano.metal` (each pixel becomes a
   ray, then an equirectangular texture lookup; rectilinear ↔ stereographic morph).
 - `Orb/Library/`: `CaptureStore` (`Documents/Captures/<uuid>/capture.json`), the library grid,
