@@ -30,10 +30,10 @@ final class MotionTracker: @unchecked Sendable {
     func start(hz: Double = 100) {
         guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
         manager.deviceMotionUpdateInterval = 1 / hz
-        let frames = CMMotionManager.availableAttitudeReferenceFrames()
-        let frame: CMAttitudeReferenceFrame = frames.contains(.xArbitraryCorrectedZVertical)
-            ? .xArbitraryCorrectedZVertical : .xArbitraryZVertical
-        manager.startDeviceMotionUpdates(using: frame, to: queue) { [weak self] motion, _ in
+        // Gyroscope-only heading. With the compass correcting it (.xArbitraryCorrectedZVertical),
+        // steel and wiring indoors swung the heading by up to 13° during a capture (tilt stayed
+        // within 3°); the gyroscope alone drifts far less over a minute or two.
+        manager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue) { [weak self] motion, _ in
             if let motion { self?.record(motion) }
         }
     }

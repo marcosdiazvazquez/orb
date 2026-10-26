@@ -184,8 +184,11 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 ### Known gaps
 
 - Moving people ghost; multi-band blending or seam cutting would fix that.
-- Dim, plain indoor scenes give the matcher only 1–3 matches per pair, too few to correct the
-  sensor rotations, which are a few degrees off there, so walls and doors double. Seen on two dim indoor captures; daylight outdoors is untested.
+- Dim, plain indoor scenes give the matcher only 1–3 matches per pair with the 0.5× lens, too
+  few to correct the sensor rotations, so walls and doors double. The 1× lens found 538 matches
+  in the same room and stitched cleanly. Seen indoors in dim light.
+- Indoors, the compass-corrected heading was off by up to 13° (yaw; tilt within 3°), so
+  `MotionTracker` now uses the gyroscope-only frame. Not yet measured on a new capture.
 - The ultra-wide's recorded FOV (106°, from the video format) is wider than its photos' EXIF says
   (14 mm equivalent, about 102°). Bundle adjustment refines focal length, but starts 8% off.
 - Alignment doesn't model parallax.
