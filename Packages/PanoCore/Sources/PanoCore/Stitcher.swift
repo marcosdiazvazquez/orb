@@ -40,6 +40,9 @@ public struct StitchReport: Sendable {
     public var gains: [Double] = []
     /// Refined camera-to-world rotations, in the output panorama's frame.
     public var rotations: [Mat3] = []
+    /// Longitude, in the input rotations' frame, that the panorama is centred on (shot 0's
+    /// heading). A direction's longitude in the panorama is its input longitude minus this.
+    public var centerLongitude = 0.0
     public var seconds = 0.0
 }
 
@@ -122,6 +125,7 @@ public enum Stitcher {
         let lon0 = atan2(-axis0.y, axis0.x)
         let world = Mat3.rotation(axis: Vec3(0, 0, 1), angle: lon0)
         report.rotations = cameras.map { world * $0.rotation }
+        report.centerLongitude = lon0
 
         progress(0.5, "Blending")
         var pano = blendEquirect(width: options.outputWidth, cameras: cameras, images: shots.map(\.image),

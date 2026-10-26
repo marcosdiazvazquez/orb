@@ -18,6 +18,9 @@ struct PanoramaInfo: Codable, Hashable {
     var alignmentDegrees: Double?
     var matches: Int
     var date: Date
+    /// Compass bearing of the panorama's centre, degrees clockwise from north. A column's
+    /// bearing is this plus its longitude, which grows to the right.
+    var heading: Double?
 }
 
 /// Where a capture was taken: the accuracy-weighted average of its best GPS fixes.
@@ -26,6 +29,18 @@ struct CaptureLocation: Codable, Hashable {
     var longitude: Double
     /// Radius of uncertainty of the best single fix, metres.
     var accuracy: Double
+}
+
+/// Which way north is, so every direction in the capture has a compass bearing.
+struct CaptureHeading: Codable, Hashable {
+    /// Bearing of the shot rotations' world X axis, degrees clockwise from north. Those rotations
+    /// come from the gyroscope alone, so X is wherever the phone pointed when tracking began.
+    var worldX: Double
+    /// Spread (circular standard deviation) of the compass readings averaged, degrees. A magnetic
+    /// disturbance that is the same in every direction biases them without widening it.
+    var spread: Double
+    /// From true north, or magnetic north when location was off.
+    var trueNorth: Bool
 }
 
 /// One capture: its shots, and the panorama once stitched. Saved as `capture.json` in the
@@ -39,6 +54,8 @@ struct CaptureRecord: Codable, Hashable, Identifiable {
     var folder: String?
     /// Where it was taken, if the phone had a precise fix.
     var location: CaptureLocation?
+    /// Which way north is, if the compass had enough readings.
+    var heading: CaptureHeading?
     var lens: Lens
     /// Field of view across the photos' long side, radians.
     var longFOV: Double

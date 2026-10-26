@@ -60,19 +60,26 @@ enum ImageCodec {
 
     /// Writes a JPEG. With `equirectangular`, adds Google's GPano XMP so Google Photos,
     /// Facebook and other 360° viewers open it as a sphere. `location` and `date` become EXIF
-    /// GPS and capture time, as a camera writes them.
+    /// GPS and capture time, as a camera writes them. `heading` is the compass bearing of the
+    /// image's centre, from true or magnetic north.
     static func writeJPEG(_ image: RGBAImage, to url: URL, quality: Double, equirectangular: Bool = false,
-                          location: CaptureLocation? = nil, date: Date? = nil) throws {
+                          location: CaptureLocation? = nil, date: Date? = nil,
+                          heading: Double? = nil, trueNorth: Bool = true) throws {
         guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
             throw ImageCodecError.unwritable(url.lastPathComponent)
         }
         var props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
-        if let location { props[kCGImagePropertyGPSDictionary] = gpsProperties(location) }
+        var gps = location.map(gpsProperties) ?? [:]
+        if let heading {
+            gps[kCGImagePropertyGPSImgDirection] = heading
+            gps[kCGImagePropertyGPSImgDirectionRef] = trueNorth ? "T" : "M"
+        }
+        if !gps.isEmpty { props[kCGImagePropertyGPSDictionary] = gps }
         if let date { props[kCGImagePropertyExifDictionary] = exifDateProperties(date) }
         let cg = cgImage(image)
         if equirectangular {
-            CGImageDestinationAddImageAndMetadata(dest, cg, panoramaMetadata(width: image.width, height: image.height),
-                                                  props as CFDictionary)
+            let xmp = panoramaMetadata(width: image.width, height: image.height, heading: heading)
+            CGImageDestinationAddImageAndMetadata(dest, cg, xmp, props as CFDictionary)
         } else {
             CGImageDestinationAddImage(dest, cg, props as CFDictionary)
         }
@@ -101,7 +108,8 @@ enum ImageCodec {
     }
 
     /// Photo Sphere XMP (https://developers.google.com/streetview/spherical-metadata).
-    static func panoramaMetadata(width: Int, height: Int) -> CGImageMetadata {
+    /// PoseHeadingDegrees is the compass bearing of the image's centre.
+    static func panoramaMetadata(width: Int, height: Int, heading: Double? = nil) -> CGImageMetadata {
         let meta = CGImageMetadataCreateMutable()
         let ns = "http://ns.google.com/photos/1.0/panorama/" as CFString
         CGImageMetadataRegisterNamespaceForPrefix(meta, ns, "GPano" as CFString, nil)
@@ -117,7 +125,8 @@ enum ImageCodec {
             ("CroppedAreaLeftPixels", "0"),
             ("CroppedAreaTopPixels", "0"),
         ]
-        for (key, value) in fields {
+        let pose = heading.map { [("PoseHeadingDegrees", String(format: "%.1f", $0))] } ?? []
+        for (key, value) in fields + pose {
             CGImageMetadataSetValueWithPath(meta, nil, "GPano:\(key)" as CFString, value as CFString)
         }
         return meta

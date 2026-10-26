@@ -99,8 +99,8 @@ private final class BackgroundTask {
 }
 
 enum StitchJob {
-    /// Decodes the shots at the resolution the output needs, stitches, and writes
-    /// `pano.jpg` (with 360° metadata, capture time, and GPS if the capture has a location),
+    /// Decodes the shots at the resolution the output needs, stitches, and writes `pano.jpg`
+    /// (with 360° metadata, capture time, and GPS and compass heading if the capture has them),
     /// `planet.jpg` and `thumb.jpg` into the capture folder.
     static func run(record: CaptureRecord, directory: URL, outputWidth: Int,
                     progress: @escaping @Sendable (Double, String) -> Void) throws -> PanoramaInfo {
@@ -125,9 +125,11 @@ enum StitchJob {
         shots.removeAll()
 
         progress(0.9, "Saving")
+        let heading = record.heading.map { Bearing.normalized($0.worldX + report.centerLongitude * 180 / .pi) }
         let panoURL = directory.appending(path: "pano.jpg")
         try ImageCodec.writeJPEG(pano, to: panoURL, quality: 0.92, equirectangular: true,
-                                 location: record.location, date: record.date)
+                                 location: record.location, date: record.date,
+                                 heading: heading, trueNorth: record.heading?.trueNorth ?? true)
         let small = pano.width > 4096 ? pano.resized(width: 4096, height: 2048) : pano
         let planet = PanoRender.littlePlanet(small, size: 2048)
         try ImageCodec.writeJPEG(planet, to: directory.appending(path: "planet.jpg"), quality: 0.9)
@@ -136,7 +138,7 @@ enum StitchJob {
 
         return PanoramaInfo(width: pano.width, height: pano.height, seconds: report.seconds,
                             alignmentDegrees: report.rounds.last?.rmsAfterDegrees,
-                            matches: report.rounds.last?.matches ?? 0, date: Date())
+                            matches: report.rounds.last?.matches ?? 0, date: Date(), heading: heading)
     }
 }
 

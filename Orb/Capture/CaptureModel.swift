@@ -23,6 +23,8 @@ final class CaptureModel {
     private(set) var shotRotations: [Mat3] = []
     /// Live camera-to-world rotation.
     private(set) var cameraRotation: Mat3?
+    /// Compass bearing the camera faces, whole degrees, once the compass has enough readings.
+    private(set) var facing: Double?
     private(set) var nextTarget: Int?
     /// 0...1 while the reticle is held on a target; the shutter fires at 1.
     private(set) var hold: Double = 0
@@ -41,6 +43,7 @@ final class CaptureModel {
     private let camera = CameraController()
     private let motion = MotionTracker()
     private let location = LocationTracker()
+    private let compass = Compass()
     private var lens: Lens = .ultraWide
     private var lockExposure = true
     private var timer: Timer?
@@ -81,6 +84,7 @@ final class CaptureModel {
             targets = ShotPlan(shortFOV: shortFOV, overlap: density.overlap).targets
             camera.start()
             motion.start()
+            compass.start(trueNorth: location.allowed)
             UIApplication.shared.isIdleTimerDisabled = true
             haptics.prepare()
             phase = .aiming
@@ -100,6 +104,7 @@ final class CaptureModel {
         timer = nil
         camera.stop()
         motion.stop()
+        compass.stop()
         location.stop()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -110,8 +115,8 @@ final class CaptureModel {
     }
 
     func makeRecord() -> CaptureRecord {
-        CaptureRecord(id: id, date: Date(), location: location.best, lens: lens, longFOV: longFOV,
-                      plannedShots: targets.count, shots: shots, panorama: nil, stitchError: nil)
+        CaptureRecord(id: id, date: Date(), location: location.best, heading: compass.heading, lens: lens,
+                      longFOV: longFOV, plannedShots: targets.count, shots: shots, panorama: nil, stitchError: nil)
     }
 
     func undoLast() {
@@ -136,6 +141,9 @@ final class CaptureModel {
         let cam = sample.rotation * deviceFromBackCamera
         cameraRotation = cam
         let axis = cam.column(2)
+        compass.update(against: motion)
+        let bearing = compass.heading.map { Bearing.normalized(($0.worldX + degreesOf(axis.longitude)).rounded()) }
+        if bearing != facing { facing = bearing }
 
         if targetDirections.isEmpty {
             // Longitude 0 of the plan is wherever the phone points when tracking starts.

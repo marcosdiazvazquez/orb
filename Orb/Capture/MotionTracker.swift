@@ -3,16 +3,20 @@ import Foundation
 import PanoCore
 
 /// Device attitude from Core Motion as a device-to-world rotation (world Z up, X arbitrary but
-/// fixed while running), with a short history so a photo can be matched to the attitude at the
-/// instant it was exposed.
+/// fixed while running, or north in a compass frame), with a short history so a photo can be
+/// matched to the attitude at the instant it was exposed.
 final class MotionTracker: @unchecked Sendable {
     struct Sample {
         let time: TimeInterval      // seconds since boot, same clock as AVCapturePhoto.timestamp
         let rotation: Mat3          // device -> world
         let rate: Double            // angular speed, rad/s
+        /// Whether Core Motion counts the compass as calibrated; always false in a frame that
+        /// doesn't use it.
+        let compassCalibrated: Bool
     }
 
     private let manager = CMMotionManager()
+    private let frame: CMAttitudeReferenceFrame
     private let queue: OperationQueue = {
         let q = OperationQueue()
         q.maxConcurrentOperationCount = 1
@@ -25,15 +29,22 @@ final class MotionTracker: @unchecked Sendable {
     /// first tilted sample by checking which reading reproduces the measured gravity.
     private var transposed: Bool?
 
-    var isAvailable: Bool { manager.isDeviceMotionAvailable }
+    /// The default is a gyroscope-only heading. With the compass correcting it
+    /// (.xArbitraryCorrectedZVertical), steel and wiring indoors swung the heading by up to 13°
+    /// during a capture (tilt stayed within 3°); the gyroscope alone drifts far less over a minute
+    /// or two. `Compass` uses a north frame to find north in that one.
+    init(frame: CMAttitudeReferenceFrame = .xArbitraryZVertical) {
+        self.frame = frame
+    }
+
+    var isAvailable: Bool {
+        manager.isDeviceMotionAvailable && CMMotionManager.availableAttitudeReferenceFrames().contains(frame)
+    }
 
     func start(hz: Double = 100) {
-        guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
+        guard isAvailable, !manager.isDeviceMotionActive else { return }
         manager.deviceMotionUpdateInterval = 1 / hz
-        // Gyroscope-only heading. With the compass correcting it (.xArbitraryCorrectedZVertical),
-        // steel and wiring indoors swung the heading by up to 13° during a capture (tilt stayed
-        // within 3°); the gyroscope alone drifts far less over a minute or two.
-        manager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue) { [weak self] motion, _ in
+        manager.startDeviceMotionUpdates(using: frame, to: queue) { [weak self] motion, _ in
             if let motion { self?.record(motion) }
         }
     }
@@ -75,7 +86,8 @@ final class MotionTracker: @unchecked Sendable {
         let r = m.rotationRate
         samples.append(Sample(time: m.timestamp,
                               rotation: transposed == true ? raw.transposed : raw,
-                              rate: sqrt(r.x * r.x + r.y * r.y + r.z * r.z)))
+                              rate: sqrt(r.x * r.x + r.y * r.y + r.z * r.z),
+                              compassCalibrated: m.magneticField.accuracy.rawValue >= CMMagneticFieldCalibrationAccuracy.low.rawValue))
         if samples.count > 400 { samples.removeFirst(samples.count - 300) }
     }
 }

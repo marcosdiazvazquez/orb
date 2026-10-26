@@ -122,6 +122,10 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   location, whenever it's off). The capture screen shows "GPS ±N m" under the shot counter,
   usually settling to a few metres outdoors. Details shows the final position, or "Not
   recorded" if location was denied or approximate, or there was no fix (common indoors).
+- **Compass.** About two seconds into a capture, a bearing label ("47° NE") joins the GPS label.
+  It should match the Compass app when the back camera faces the same way. In the viewer, the
+  label at the top should read the real bearing of what's in the middle of the screen (check it
+  against a street on a map). Details shows the centre's bearing and the compass spread.
 - **Report back.** Nate wants a raw capture folder for tuning: Files › On My iPhone › Orb ›
   Captures › `<uuid>`, which holds `capture.json`, `shot-NN.heic` and `pano.jpg`.
 
@@ -137,11 +141,12 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
     length, and check that stitching recovers them.
 - `Orb/Capture/`: `CameraController` (AVFoundation, photo output, exposure lock),
   `MotionTracker` (Core Motion attitude history), `LocationTracker` (Core Location, an
-  accuracy-weighted average of the best fixes during a capture), `CaptureModel` (target logic and auto-shutter), `CaptureView`
-  (preview, overlay, controls).
+  accuracy-weighted average of the best fixes during a capture), `Compass` (where north is in
+  the gyroscope frame, from a second, compass-steered Core Motion feed), `CaptureModel` (target
+  logic and auto-shutter), `CaptureView` (preview, overlay, controls).
 - `Orb/Stitch/`: `StitchService` (a queue, off the main thread), `StitchJob` (decode, stitch,
   write `pano.jpg`, `planet.jpg`, `thumb.jpg`), `ImageCodec` (ImageIO, Display P3, GPano XMP,
-  EXIF GPS and capture time).
+  EXIF GPS, compass heading and capture time).
 - `Orb/Viewer/`: `PanoViewer` (MTKView, gestures, gyro) and `Pano.metal` (each pixel becomes a
   ray, then an equirectangular texture lookup; rectilinear ↔ stereographic morph).
 - `Orb/Library/`: `CaptureStore` (`Documents/Captures/<uuid>/capture.json`, names and folders),
@@ -166,6 +171,10 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   - The viewer alone turns to landscape (`OrientationLock`); capture stays portrait. There the
     view frame is the device frame turned a quarter about z (`gyroViewToWorld`), and the zoom
     extent spans the longer side, so turning the phone keeps the scale.
+- **Compass heading.** `CaptureHeading.worldX` is the bearing of the shot rotations' world X.
+  The panorama's centre is at `worldX` plus `StitchReport.centerLongitude`
+  (`PanoramaInfo.heading`, also written to the JPEG). A direction's bearing is that plus its
+  longitude. Core Motion's north frames are X north, Y west, Z up, so longitude there is bearing.
 - **Uniforms.** `PanoRenderer.Uniforms` and the `Uniforms` struct in `Pano.metal` are both
   64 bytes, with float3x3 taking 48. Change them together.
 
@@ -193,6 +202,9 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 - Indoors, the compass-corrected heading was off by up to 15° (yaw; tilt within 3°), so
   `MotionTracker` now uses the gyroscope-only frame. On two outdoor captures since, the heading
   was off by a median of 0.2–0.5° (max 1.9°). Indoors with the gyroscope alone is untested.
+- The compass heading hasn't been checked against known bearings on a phone yet. It runs a second
+  `CMMotionManager` (north frame) next to the gyroscope-only one. Apple recommends a single
+  instance, so check that the stitches' yaw corrections stay as small as before.
 - The ultra-wide's recorded FOV (106°, from the video format) is wider than its photos' EXIF says
   (14 mm equivalent, about 102°). Bundle adjustment refines focal length, but starts 8% off.
 - Alignment doesn't model parallax.

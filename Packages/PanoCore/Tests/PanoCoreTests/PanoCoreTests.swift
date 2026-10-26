@@ -176,6 +176,9 @@ final class StitchTests: XCTestCase {
 
         XCTAssertLessThan(err.max()!, 0.15)
         XCTAssertEqual(report.focalScale, 1 / 1.03, accuracy: 0.005)
+        // Shot 0 is held fixed, so the centre is its input heading.
+        let axis0 = setup.shots[0].rotation.column(2)
+        XCTAssertEqual(report.centerLongitude, atan2(-axis0.y, axis0.x), accuracy: 1e-9)
         XCTAssertGreaterThan(refinedPSNR, rawPSNR + 3)
         // The brightened shot should be turned down relative to the rest.
         let others = report.gains.enumerated().filter { $0.offset != 5 }.map(\.element)

@@ -27,8 +27,8 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
         return usable ? .searching : .off
     }
 
-    /// Location allowed at all, while in use or always.
-    private var allowed: Bool {
+    /// Location allowed at all, while in use or always. Core Motion needs it for true north.
+    var allowed: Bool {
         let status = manager.authorizationStatus
         return status != .notDetermined && status != .denied && status != .restricted
     }

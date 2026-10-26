@@ -66,7 +66,12 @@ struct CaptureView: View {
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
-                    if model.phase == .aiming { gpsLabel }
+                    if model.phase == .aiming {
+                        HStack(spacing: 6) {
+                            gpsLabel
+                            if let facing = model.facing { BearingLabel(degrees: facing) }
+                        }
+                    }
                 }
                 Spacer()
                 Button { model.undoLast() } label: {

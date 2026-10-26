@@ -16,6 +16,10 @@ struct PanoViewer: UIViewRepresentable {
     let version: Date?
     @Binding var mode: PanoViewMode
     var gyro: Bool
+    /// Compass bearing of the panorama's centre, if known.
+    var heading: Double?
+    /// Gets the bearing the view faces, in whole degrees, as it changes.
+    var onBearing: ((Double) -> Void)?
 
     func makeCoordinator() -> PanoRenderer { PanoRenderer() }
 
@@ -35,6 +39,8 @@ struct PanoViewer: UIViewRepresentable {
     func updateUIView(_ view: MTKView, context: Context) {
         let renderer = context.coordinator
         renderer.onToggleMode = { mode = (mode == .look) ? .planet : .look }
+        renderer.heading = heading
+        renderer.onBearing = onBearing
         renderer.load(url, version: version)
         renderer.setMode(mode)
         renderer.setGyro(gyro)
@@ -55,6 +61,9 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
 
     let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     var onToggleMode: (() -> Void)?
+    var heading: Double?
+    var onBearing: ((Double) -> Void)?
+    private var bearing: Double?
 
     private lazy var commandQueue = device.makeCommandQueue()!
     private lazy var pipeline: MTLRenderPipelineState? = {
@@ -193,6 +202,14 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
             viewToWorld = g
         } else {
             viewToWorld = dragViewToWorld(pitch: pitch + (-Double.pi / 2 - pitch) * t)
+        }
+        if let heading {
+            // Longitude grows to the right, clockwise from above, as bearings do.
+            let b = Bearing.normalized((heading + (viewToWorld * Vec3(0, 0, -1)).longitude * 180 / .pi).rounded())
+            if b != bearing {
+                bearing = b
+                DispatchQueue.main.async { [onBearing] in onBearing?(b) }
+            }
         }
         let extent = lookExtent + (planetExtent - lookExtent) * t
         let size = view.drawableSize

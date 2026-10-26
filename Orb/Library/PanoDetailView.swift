@@ -9,6 +9,8 @@ struct PanoDetailView: View {
     @AppStorage(SettingsKey.output) private var output: OutputQuality = .high
     @State private var mode: PanoViewMode = .look
     @State private var gyro = false
+    /// Compass bearing the view faces, if the panorama has a heading.
+    @State private var bearing: Double?
     @State private var showInfo = false
     @State private var confirmDelete = false
     @State private var alert: String?
@@ -20,7 +22,8 @@ struct PanoDetailView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let record, let pano = record.panorama {
-                PanoViewer(url: store.panoramaURL(id), version: pano.date, mode: $mode, gyro: gyro)
+                PanoViewer(url: store.panoramaURL(id), version: pano.date, mode: $mode, gyro: gyro,
+                           heading: pano.heading, onBearing: { bearing = $0 })
                     .ignoresSafeArea()
             }
             if let job = stitcher.jobs[id] {
@@ -44,6 +47,11 @@ struct PanoDetailView: View {
                 .padding(24)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
                 .padding(24)
+            }
+        }
+        .overlay(alignment: .top) {
+            if mode == .look, record?.panorama?.heading != nil, let bearing {
+                BearingLabel(degrees: bearing).padding(.top, 8)
             }
         }
         .navigationTitle(record.map { $0.name ?? $0.date.formatted(date: .abbreviated, time: .shortened) } ?? "")
@@ -142,6 +150,10 @@ private struct InfoSheet: View {
                 LabeledContent("Lens", value: "\(record.lens.label), \(Int((record.longFOV * 180 / .pi).rounded()))°")
                 LabeledContent("Location", value: record.location.map {
                     String(format: "%.5f, %.5f (±%.0f m)", $0.latitude, $0.longitude, $0.accuracy)
+                } ?? "Not recorded")
+                LabeledContent("Heading", value: record.heading.map { h in
+                    let centre = record.panorama?.heading.map { "Centre \(Bearing.label($0)), " } ?? ""
+                    return centre + String(format: "±%.0f°", h.spread) + (h.trueNorth ? "" : " (magnetic)")
                 } ?? "Not recorded")
                 if let p = record.panorama {
                     LabeledContent("Panorama", value: "\(p.width) × \(p.height)")
