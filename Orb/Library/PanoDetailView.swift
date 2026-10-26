@@ -12,6 +12,7 @@ struct PanoDetailView: View {
     @State private var showInfo = false
     @State private var confirmDelete = false
     @State private var alert: String?
+    @State private var prompt: NamePrompt?
 
     private var record: CaptureRecord? { store.record(id) }
 
@@ -45,7 +46,7 @@ struct PanoDetailView: View {
                 .padding(24)
             }
         }
-        .navigationTitle(record.map { $0.date.formatted(date: .abbreviated, time: .shortened) } ?? "")
+        .navigationTitle(record.map { $0.name ?? $0.date.formatted(date: .abbreviated, time: .shortened) } ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { if record?.panorama != nil { bottomBar } }
@@ -59,6 +60,7 @@ struct PanoDetailView: View {
         .alert(alert ?? "", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })) {
             Button("OK", role: .cancel) {}
         }
+        .namePrompt($prompt)
     }
 
     @ToolbarContentBuilder private var bottomBar: some ToolbarContent {
@@ -74,9 +76,18 @@ struct PanoDetailView: View {
             }
             .accessibilityLabel(mode == .look ? "Little planet" : "Look around")
             Spacer()
-            ShareLink(item: store.panoramaURL(id)) { Image(systemName: "square.and.arrow.up") }
+            if let record {
+                ShareLink(item: SharedPanorama(record), preview: SharePreview(record.title)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
             Spacer()
             Menu {
+                Button {
+                    prompt = NamePrompt(title: "Rename", text: record?.name ?? "") { store.rename(id, to: $0) }
+                } label: { Label("Rename", systemImage: "pencil") }
+                MoveToFolderMenu(id: id, prompt: $prompt)
+                Divider()
                 Button { Task { await saveToPhotos() } } label: { Label("Save to Photos", systemImage: "photo.on.rectangle") }
                 ShareLink(item: store.planetURL(id)) { Label("Share Little Planet", systemImage: "globe.europe.africa") }
                 Menu {
@@ -101,10 +112,14 @@ struct PanoDetailView: View {
             return
         }
         let url = store.panoramaURL(id)
+        let fileName = "\(record?.fileName ?? "Orb").jpg"
         do {
-            // Adding the file itself keeps the 360° metadata intact.
+            // Adding the file itself keeps the 360° metadata intact; the original file name is
+            // what Photos exports it as.
             try await PHPhotoLibrary.shared().performChanges {
-                PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: nil)
+                let options = PHAssetResourceCreationOptions()
+                options.originalFilename = fileName
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: options)
             }
             alert = "Saved to Photos. Google Photos and Facebook show it as a 360° photo."
         } catch {

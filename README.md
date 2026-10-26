@@ -54,13 +54,26 @@ AltServer-Linux port runs on Linux).
   PanoCore and writes the outputs. `Viewer/` is the Metal panorama viewer. `Library/` holds the
   capture store and the screens.
 
-Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (the GPS
-position, and per shot: file name and device-to-world rotation), `shot-NN.heic`, and after
+Each capture is a folder `Documents/Captures/<uuid>/` that holds `capture.json` (its name, folder
+and GPS position, and per shot: file name and device-to-world rotation), `shot-NN.heic`, and after
 stitching `pano.jpg` (equirectangular, 2:1, GPano XMP, EXIF GPS and capture time), `planet.jpg`
 and `thumb.jpg`. The GPS position averages the fixes from the whole capture, weighted by their
 accuracy, keeping only those within 1.5× of the best. The capture screen shows the live
 accuracy, and Details (⋯ › Details) the final position, so you can check it before leaving the
 spot.
+
+## Names, folders and sharing
+
+- Touch and hold a panorama to rename it, move it to a folder, or share it. The detail view's ⋯
+  menu has the same. The folder button at the top of the library makes a folder, and panoramas
+  captured from inside a folder are filed in it. Deleting a folder keeps its panoramas.
+- Shared panoramas, and those saved to Photos, are named after the capture instead of `pano.jpg`:
+  `Memorial Hall Steps.jpg`, or `Orb 2026-01-15 14.30.00.jpg` without a name. They are the same
+  bytes as `pano.jpg`, so the GPS, capture time and 360° metadata go along.
+- A folder's ⋯ menu shares all its panoramas at once, for example by AirDrop to a Mac for the
+  game's `npm run photos:locations`.
+- Names and folders are kept in `capture.json` and `Library/Application Support/folders.json`.
+  Capture folders on disk keep their UUID names, and renaming never rewrites `pano.jpg`.
 
 ## Tips for clean stitches
 

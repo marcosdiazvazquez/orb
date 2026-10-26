@@ -3,6 +3,8 @@ import PanoCore
 import SwiftUI
 
 struct CaptureView: View {
+    /// Where the new panorama is filed; nil is the top level.
+    var folder: String?
     @Environment(\.dismiss) private var dismiss
     @Environment(CaptureStore.self) private var store
     @Environment(StitchService.self) private var stitcher
@@ -142,7 +144,8 @@ struct CaptureView: View {
     private func finish() {
         guard model.shots.count >= 2 else { return }
         model.stop()
-        let record = model.makeRecord()
+        var record = model.makeRecord()
+        record.folder = folder
         store.save(record)
         stitcher.enqueue(record.id, outputWidth: output.rawValue)
         dismiss()

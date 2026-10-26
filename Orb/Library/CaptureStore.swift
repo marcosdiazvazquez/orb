@@ -33,6 +33,10 @@ struct CaptureLocation: Codable, Hashable {
 struct CaptureRecord: Codable, Hashable, Identifiable {
     var id: UUID
     var date: Date
+    /// Given by the user; without one, the library shows the date.
+    var name: String?
+    /// The folder it's filed in; nil is the top level of the library.
+    var folder: String?
     /// Where it was taken, if the phone had a precise fix.
     var location: CaptureLocation?
     var lens: Lens
@@ -44,11 +48,31 @@ struct CaptureRecord: Codable, Hashable, Identifiable {
     var stitchError: String?
 }
 
+extension CaptureRecord {
+    var title: String { name ?? date.formatted(.dateTime.month(.abbreviated).day().hour().minute()) }
+
+    /// The name, without `.jpg`, that the panorama is shared and saved to Photos under, so each
+    /// file is named after its spot rather than `pano.jpg`.
+    var fileName: String {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        let base = name ?? "Orb \(format.string(from: date))"
+        let safe = base.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".").union(.whitespacesAndNewlines))
+        return safe.isEmpty ? "Orb" : safe
+    }
+}
+
 @Observable @MainActor
 final class CaptureStore {
     private(set) var captures: [CaptureRecord] = []
+    /// Folder names, empty ones included, in Finder order.
+    private(set) var folders: [String] = []
 
     nonisolated static let root = URL.documentsDirectory.appending(path: "Captures", directoryHint: .isDirectory)
+    /// Outside `root`, whose loose files `load()` would clear away, and hidden from the Files app.
+    nonisolated static let foldersURL = URL.applicationSupportDirectory.appending(path: "folders.json")
 
     nonisolated static func directory(for id: UUID) -> URL {
         root.appending(path: id.uuidString, directoryHint: .isDirectory)
@@ -79,6 +103,79 @@ final class CaptureStore {
             }
         }
         captures = found.sorted { $0.date > $1.date }
+        let saved = (try? Data(contentsOf: Self.foldersURL)).flatMap { try? JSONDecoder().decode([String].self, from: $0) }
+        folders = Self.sorted(Set(saved ?? []).union(found.compactMap(\.folder)))
+    }
+
+    func captures(in folder: String?) -> [CaptureRecord] { captures.filter { $0.folder == folder } }
+
+    func rename(_ id: UUID, to name: String) {
+        guard var record = record(id) else { return }
+        record.name = Self.cleaned(name)
+        save(record)
+    }
+
+    func move(_ id: UUID, to folder: String?) {
+        guard var record = record(id) else { return }
+        record.folder = folder
+        save(record)
+    }
+
+    /// Adds a folder, or finds the one with that name. Nil for a blank name.
+    @discardableResult func createFolder(_ name: String) -> String? {
+        guard let name = Self.cleaned(name) else { return nil }
+        if !folders.contains(name) { setFolders(folders + [name]) }
+        return name
+    }
+
+    /// Renames a folder, merging it into any folder already called `newName`. Returns the name
+    /// the folder ends up with.
+    @discardableResult func renameFolder(_ folder: String, to newName: String) -> String {
+        guard let newName = Self.cleaned(newName), newName != folder else { return folder }
+        for var record in captures where record.folder == folder {
+            record.folder = newName
+            save(record)
+        }
+        setFolders(folders.filter { $0 != folder } + [newName])
+        return newName
+    }
+
+    /// Removes a folder. Its panoramas aren't deleted; they move to the top level.
+    func deleteFolder(_ folder: String) {
+        for var record in captures where record.folder == folder {
+            record.folder = nil
+            save(record)
+        }
+        setFolders(folders.filter { $0 != folder })
+    }
+
+    private func setFolders(_ names: [String]) {
+        folders = Self.sorted(Set(names))
+        try? FileManager.default.createDirectory(at: Self.foldersURL.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(folders) { try? data.write(to: Self.foldersURL, options: .atomic) }
+    }
+
+    private static func sorted(_ names: Set<String>) -> [String] {
+        names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private static func cleaned(_ name: String) -> String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// A link named `<fileName>.jpg` to the capture's `pano.jpg`, for sharing. It's the same
+    /// bytes, so the GPS, capture time and 360° metadata go along unchanged.
+    nonisolated static func namedPanorama(id: UUID, fileName: String) throws -> URL {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appending(path: "Shared/\(id.uuidString)", directoryHint: .isDirectory)
+        try? fm.removeItem(at: dir)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = directory(for: id).appending(path: "pano.jpg")
+        let link = dir.appending(path: "\(fileName).jpg")
+        do { try fm.linkItem(at: source, to: link) } catch { try fm.copyItem(at: source, to: link) }
+        return link
     }
 
     func save(_ record: CaptureRecord) {
