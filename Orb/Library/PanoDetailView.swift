@@ -61,6 +61,8 @@ struct PanoDetailView: View {
             Button("OK", role: .cancel) {}
         }
         .namePrompt($prompt)
+        .onAppear { OrientationLock.allow(.allButUpsideDown) }
+        .onDisappear { OrientationLock.allow(.portrait) }
     }
 
     @ToolbarContentBuilder private var bottomBar: some ToolbarContent {

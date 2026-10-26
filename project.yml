@@ -37,7 +37,13 @@ targets:
           Capture: Orb needs your precise location to tag this panorama with where it was taken.
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Landscape only while a panorama is open; OrientationLock keeps the rest in portrait.
+        UISupportedInterfaceOrientations:
+          [
+            UIInterfaceOrientationPortrait,
+            UIInterfaceOrientationLandscapeLeft,
+            UIInterfaceOrientationLandscapeRight,
+          ]
         # The type a panorama is dragged as within the app (CaptureDrag).
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.nathanielcblack.orb.capture

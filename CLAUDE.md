@@ -163,6 +163,9 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   gravity.
 - **Viewer.** In portrait, the view frame is the device frame. The drag camera is
   `yaw · base · Rx(pitch)`.
+  - The viewer alone turns to landscape (`OrientationLock`); capture stays portrait. There the
+    view frame is the device frame turned a quarter about z (`gyroViewToWorld`), and the zoom
+    extent spans the longer side, so turning the phone keeps the scale.
 - **Uniforms.** `PanoRenderer.Uniforms` and the `Uniforms` struct in `Pano.metal` are both
   64 bytes, with float3x3 taking 48. Change them together.
 

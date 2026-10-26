@@ -93,6 +93,8 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
     private var gyro = false
     private var gyroYaw = 0.0
     private var gyroNeedsAlign = false
+    /// Which way the screen is turned, for steering with the phone in landscape.
+    private var orientation = UIInterfaceOrientation.portrait
 
     func attach(to view: MTKView) {
         view.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(onPan(_:))))
@@ -146,10 +148,16 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
         return Mat3.yaw(yaw) * base * Mat3.rotation(axis: Vec3(1, 0, 0), angle: p)
     }
 
-    /// In portrait the view frame is the device frame, so the attitude is the view rotation.
+    /// In portrait the view frame is the device frame, so the attitude is the view rotation. In
+    /// landscape the view frame is the device frame turned a quarter about the screen normal.
     private func gyroViewToWorld() -> Mat3? {
         guard let attitude = motion.latest?.rotation else { return nil }
-        return Mat3.yaw(gyroYaw) * attitude
+        let quarterTurns: Double = switch orientation {
+        case .landscapeRight: -1    // top edge to the left: view up is device +x
+        case .landscapeLeft: 1      // top edge to the right: view up is device -x
+        default: 0
+        }
+        return Mat3.yaw(gyroYaw) * attitude * Mat3.rotation(axis: Vec3(0, 0, 1), angle: quarterTurns * .pi / 2)
     }
 
     private func gyroForward() -> Vec3? { gyroViewToWorld().map { $0 * Vec3(0, 0, -1) } }
@@ -160,6 +168,7 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
         let now = CACurrentMediaTime()
         let dt = min(0.05, now - lastFrame)
         lastFrame = now
+        orientation = view.window?.windowScene?.interfaceOrientation ?? .portrait
 
         planet += (planetTarget - planet) * min(1, dt * 7)
         if abs(planetTarget - planet) < 0.001 { planet = planetTarget }
@@ -192,8 +201,10 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
         guard let pipeline, let texture, let pass = view.currentRenderPassDescriptor,
               let drawable = view.currentDrawable, let buffer = commandQueue.makeCommandBuffer(),
               let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { return }
+        // `extent` spans the longer side, so turning the phone sideways keeps the scale.
+        let tanHalf = aspect > 1 ? SIMD2(Float(extent), Float(extent / aspect)) : SIMD2(Float(extent * aspect), Float(extent))
         var uniforms = Uniforms(viewToWorld: viewToWorld.simd,
-                                tanHalf: SIMD2(Float(extent * aspect), Float(extent)),
+                                tanHalf: tanHalf,
                                 projection: Float(t),
                                 texHeight: Float(texture.height))
         encoder.setRenderPipelineState(pipeline)
@@ -223,8 +234,10 @@ final class PanoRenderer: NSObject, MTKViewDelegate {
 
     @objc private func onPan(_ g: UIPanGestureRecognizer) {
         guard let view = g.view, view.bounds.height > 0 else { return }
-        // Radians per point at the centre of the view, so content tracks the finger.
-        let k = 2 * currentExtent / Double(view.bounds.height) / (planetTarget > 0.5 ? 2 : 1)
+        // Radians per point at the centre of the view, so content tracks the finger. The extent
+        // spans the longer side.
+        let long = Double(max(view.bounds.width, view.bounds.height))
+        let k = 2 * currentExtent / long / (planetTarget > 0.5 ? 2 : 1)
         switch g.state {
         case .began:
             dragging = true
