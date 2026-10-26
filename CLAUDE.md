@@ -187,8 +187,9 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 - Dim, plain indoor scenes give the matcher only 1–3 matches per pair with the 0.5× lens, too
   few to correct the sensor rotations, so walls and doors double. The 1× lens found 538 matches
   in the same room and stitched cleanly. Seen indoors in dim light.
-- Indoors, the compass-corrected heading was off by up to 13° (yaw; tilt within 3°), so
-  `MotionTracker` now uses the gyroscope-only frame. Not yet measured on a new capture.
+- Indoors, the compass-corrected heading was off by up to 15° (yaw; tilt within 3°), so
+  `MotionTracker` now uses the gyroscope-only frame. On two outdoor captures since, the heading
+  was off by a median of 0.2–0.5° (max 1.9°). Indoors with the gyroscope alone is untested.
 - The ultra-wide's recorded FOV (106°, from the video format) is wider than its photos' EXIF says
   (14 mm equivalent, about 102°). Bundle adjustment refines focal length, but starts 8% off.
 - Alignment doesn't model parallax.
