@@ -8,15 +8,19 @@ func gainCompensation(count n: Int, stats: [OverlapStats], sigmaN: Double = 10, 
     var b = [Double](repeating: 0, count: n)
     let sn = 1 / (sigmaN * sigmaN), sg = 1 / (sigmaG * sigmaG)
     for s in stats {
-        // Normalize the pixel count so big overlaps don't swamp the prior.
         let w = Double(s.count) / 1000
         let (i, j, Ii, Ij) = (s.i, s.j, s.meanI, s.meanJ)
         A[i * n + i] += w * Ii * Ii * sn
         A[j * n + j] += w * Ij * Ij * sn
         A[i * n + j] -= w * Ii * Ij * sn
         A[j * n + i] -= w * Ii * Ij * sn
+        // The prior is weighted by the overlap too, as in the paper (and OpenCV). Weighted once
+        // per shot instead, it was ~1000x too weak, and since the brightness term alone is least
+        // at g = 0, real overlaps that never agree exactly pulled every gain down (to ~0.25).
+        A[i * n + i] += w * sg / 2; b[i] += w * sg / 2
+        A[j * n + j] += w * sg / 2; b[j] += w * sg / 2
     }
-    for k in 0..<n { A[k * n + k] += sg; b[k] += sg }
+    for k in 0..<n { A[k * n + k] += sg; b[k] += sg }  // keeps a shot without overlaps at 1
     return choleskySolve(A, b, n) ?? [Double](repeating: 1, count: n)
 }
 

@@ -182,6 +182,10 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
 ### Known gaps
 
 - Moving people ghost; multi-band blending or seam cutting would fix that.
+- Dim, plain indoor scenes give the matcher only 1–3 matches per pair, too few to correct the
+  sensor rotations, which are a few degrees off there, so walls and doors double. Seen on two dim indoor captures; daylight outdoors is untested.
+- The ultra-wide's recorded FOV (106°, from the video format) is wider than its photos' EXIF says
+  (14 mm equivalent, about 102°). Bundle adjustment refines focal length, but starts 8% off.
 - Alignment doesn't model parallax.
 - No HDR brackets.
 - No visionOS viewer.

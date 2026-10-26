@@ -196,6 +196,16 @@ final class StitchTests: XCTestCase {
         let planet = PanoRender.littlePlanet(pano, size: 128)
         XCTAssertEqual(planet.width, 128)
     }
+
+    /// Real overlaps never agree exactly (noise, vignetting, slight misalignment). Gains should
+    /// even them out without changing the overall brightness; they once came out near 0.25.
+    func testGainsKeepBrightnessWhenOverlapsDisagree() {
+        // A ring of four shots, each overlap 4% brighter in one shot than in the next, so no
+        // gains can match them all. Counts are the size of real overlaps.
+        let stats = (0..<4).map { OverlapStats(i: $0, j: ($0 + 1) % 4, meanI: 104, meanJ: 100, count: 500_000) }
+        let gains = gainCompensation(count: 4, stats: stats)
+        XCTAssertEqual(gains.reduce(0, +) / Double(gains.count), 1, accuracy: 0.03)
+    }
 }
 
 /// Full-size timing run (ORB_PERF=1 swift test -c release --filter Perf): phone-sized shots, 6K output.
