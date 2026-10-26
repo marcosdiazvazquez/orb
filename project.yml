@@ -38,6 +38,11 @@ targets:
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # The type a panorama is dragged as within the app (CaptureDrag).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.nathanielcblack.orb.capture
+            UTTypeDescription: Orb panorama
+            UTTypeConformsTo: [public.data]
         UIRequiredDeviceCapabilities: [arm64, gyroscope, still-camera, metal]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true

@@ -5,6 +5,8 @@ struct LibraryView: View {
     @State private var capturing = false
     @State private var showSettings = false
     @State private var prompt: NamePrompt?
+    /// The folder a dragged panorama is over.
+    @State private var dropTarget: String?
 
     var body: some View {
         NavigationStack {
@@ -21,9 +23,18 @@ struct LibraryView: View {
                             if !store.folders.isEmpty {
                                 LazyVGrid(columns: CaptureGrid.columns, spacing: 18) {
                                     ForEach(store.folders, id: \.self) { name in
-                                        NavigationLink(value: FolderRoute(name: name)) { FolderCell(name: name) }
-                                            .buttonStyle(.plain)
-                                            .contextMenu { FolderMenu(name: name, prompt: $prompt) }
+                                        NavigationLink(value: FolderRoute(name: name)) {
+                                            FolderCell(name: name, isTargeted: dropTarget == name)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .contextMenu { FolderMenu(name: name, prompt: $prompt) }
+                                        .dropDestination(for: CaptureDrag.self) { drags, _ in
+                                            let ids = drags.map(\.id).filter { store.record($0) != nil }
+                                            for id in ids { store.move(id, to: name) }
+                                            return !ids.isEmpty
+                                        } isTargeted: { over in
+                                            if over { dropTarget = name } else if dropTarget == name { dropTarget = nil }
+                                        }
                                     }
                                 }
                             }
@@ -75,6 +86,7 @@ struct CaptureGrid: View {
             ForEach(records) { record in
                 NavigationLink(value: record.id) { LibraryCell(record: record) }
                     .buttonStyle(.plain)
+                    .draggable(CaptureDrag(id: record.id))  // onto a folder in the library
                     .contextMenu {
                         Button {
                             prompt = NamePrompt(title: "Rename", text: record.name ?? "") { store.rename(record.id, to: $0) }
@@ -137,6 +149,8 @@ private struct LibraryCell: View {
 /// A folder, shown with its newest panorama as the cover.
 private struct FolderCell: View {
     let name: String
+    /// A dragged panorama is over it.
+    var isTargeted = false
     @Environment(CaptureStore.self) private var store
 
     var body: some View {
@@ -156,6 +170,13 @@ private struct FolderCell: View {
             }
             .aspectRatio(1, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.yellow, lineWidth: 4)
+                }
+            }
+            .scaleEffect(isTargeted ? 1.05 : 1)
+            .animation(.spring(duration: 0.25), value: isTargeted)
 
             Text(name)
                 .font(.subheadline.weight(.medium))

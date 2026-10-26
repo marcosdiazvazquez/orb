@@ -1,4 +1,19 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+extension UTType {
+    /// A panorama being dragged within Orb. Declared in project.yml.
+    static let orbCapture = UTType(exportedAs: "com.nathanielcblack.orb.capture")
+}
+
+/// What a dragged panorama carries: which capture it is, nothing other apps would accept.
+struct CaptureDrag: Codable, Transferable {
+    let id: UUID
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .orbCapture)
+    }
+}
 
 /// One folder's panoramas. Captures taken from here are filed in it.
 struct FolderView: View {

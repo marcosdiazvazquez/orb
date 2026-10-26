@@ -64,6 +64,7 @@ spot.
 
 ## Names, folders and sharing
 
+- Drag a panorama onto a folder in the library to file it there.
 - Touch and hold a panorama to rename it, move it to a folder, or share it. The detail view's ⋯
   menu has the same. The folder button at the top of the library makes a folder, and panoramas
   captured from inside a folder are filed in it. Deleting a folder keeps its panoramas.
