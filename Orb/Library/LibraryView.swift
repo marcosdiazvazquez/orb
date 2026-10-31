@@ -5,8 +5,6 @@ struct LibraryView: View {
     @State private var capturing = false
     @State private var showSettings = false
     @State private var prompt: NamePrompt?
-    /// The folder a dragged panorama is over.
-    @State private var dropTarget: String?
 
     var body: some View {
         NavigationStack {
@@ -20,24 +18,7 @@ struct LibraryView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 18) {
-                            if !store.folders.isEmpty {
-                                LazyVGrid(columns: CaptureGrid.columns, spacing: 18) {
-                                    ForEach(store.folders, id: \.self) { name in
-                                        NavigationLink(value: FolderRoute(name: name)) {
-                                            FolderCell(name: name, isTargeted: dropTarget == name)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .contextMenu { FolderMenu(name: name, prompt: $prompt) }
-                                        .dropDestination(for: CaptureDrag.self) { drags, _ in
-                                            let ids = drags.map(\.id).filter { store.record($0) != nil }
-                                            for id in ids { store.move(id, to: name) }
-                                            return !ids.isEmpty
-                                        } isTargeted: { over in
-                                            if over { dropTarget = name } else if dropTarget == name { dropTarget = nil }
-                                        }
-                                    }
-                                }
-                            }
+                            FolderGrid(parent: nil, prompt: $prompt)
                             CaptureGrid(records: store.captures(in: nil), prompt: $prompt)
                         }
                         .padding(16)
@@ -55,7 +36,7 @@ struct LibraryView: View {
                 }
             }
             .navigationDestination(for: UUID.self) { PanoDetailView(id: $0) }
-            .navigationDestination(for: FolderRoute.self) { FolderView(name: $0.name) }
+            .navigationDestination(for: FolderRoute.self) { FolderView(path: $0.path) }
             .safeAreaInset(edge: .bottom) {
                 ShutterButton { capturing = true }
                     .padding(.vertical, 10)
@@ -70,7 +51,39 @@ struct LibraryView: View {
 }
 
 struct FolderRoute: Hashable {
-    let name: String
+    let path: String
+}
+
+/// The folders directly in `parent`, each opening its folder view and taking dragged panoramas.
+struct FolderGrid: View {
+    /// Nil is the top level.
+    let parent: String?
+    @Binding var prompt: NamePrompt?
+    /// The folder a dragged panorama is over.
+    @State private var dropTarget: String?
+    @Environment(CaptureStore.self) private var store
+
+    var body: some View {
+        let paths = store.subfolders(of: parent)
+        if !paths.isEmpty {
+            LazyVGrid(columns: CaptureGrid.columns, spacing: 18) {
+                ForEach(paths, id: \.self) { path in
+                    NavigationLink(value: FolderRoute(path: path)) {
+                        FolderCell(path: path, isTargeted: dropTarget == path)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { FolderMenu(path: path, prompt: $prompt) }
+                    .dropDestination(for: CaptureDrag.self) { drags, _ in
+                        let ids = drags.map(\.id).filter { store.record($0) != nil }
+                        for id in ids { store.move(id, to: path) }
+                        return !ids.isEmpty
+                    } isTargeted: { over in
+                        if over { dropTarget = path } else if dropTarget == path { dropTarget = nil }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Panoramas, newest first, each opening its detail view.
@@ -79,6 +92,7 @@ struct CaptureGrid: View {
 
     let records: [CaptureRecord]
     @Binding var prompt: NamePrompt?
+    @State private var describing: CaptureRecord?
     @Environment(CaptureStore.self) private var store
 
     var body: some View {
@@ -91,6 +105,7 @@ struct CaptureGrid: View {
                         Button {
                             prompt = NamePrompt(title: "Rename", text: record.name ?? "") { store.rename(record.id, to: $0) }
                         } label: { Label("Rename", systemImage: "pencil") }
+                        DescriptionButton(record: record, editing: $describing)
                         MoveToFolderMenu(id: record.id, prompt: $prompt)
                         if record.panorama != nil {
                             ShareLink(item: SharedPanorama(record), preview: SharePreview(record.title)) {
@@ -103,6 +118,7 @@ struct CaptureGrid: View {
                     }
             }
         }
+        .sheet(item: $describing) { DescriptionEditor(record: $0) }
     }
 }
 
@@ -146,15 +162,15 @@ private struct LibraryCell: View {
     }
 }
 
-/// A folder, shown with its newest panorama as the cover.
+/// A folder, shown with its newest panorama as the cover. Subfolders' panoramas count.
 private struct FolderCell: View {
-    let name: String
+    let path: String
     /// A dragged panorama is over it.
     var isTargeted = false
     @Environment(CaptureStore.self) private var store
 
     var body: some View {
-        let records = store.captures(in: name)
+        let records = store.captures(within: path)
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .bottomLeading) {
                 if let cover = records.first {
@@ -178,7 +194,7 @@ private struct FolderCell: View {
             .scaleEffect(isTargeted ? 1.05 : 1)
             .animation(.spring(duration: 0.25), value: isTargeted)
 
-            Text(name)
+            Text(FolderPath.name(path))
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
             Text(records.count == 1 ? "1 panorama" : "\(records.count) panoramas")

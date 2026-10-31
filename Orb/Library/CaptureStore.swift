@@ -50,7 +50,10 @@ struct CaptureRecord: Codable, Hashable, Identifiable {
     var date: Date
     /// Given by the user; without one, the library shows the date.
     var name: String?
-    /// The folder it's filed in; nil is the top level of the library.
+    /// Free text about the panorama, of any length. Unlike the name, it isn't the title or the
+    /// file name, and it isn't in `pano.jpg`, so it stays behind when the panorama is shared.
+    var description: String?
+    /// The path of the folder it's filed in (see `FolderPath`); nil is the top level of the library.
     var folder: String?
     /// Where it was taken, if the phone had a precise fix.
     var location: CaptureLocation?
@@ -81,10 +84,32 @@ extension CaptureRecord {
     }
 }
 
+/// A folder is known by its path from the top of the library, such as `Trips/Italy`.
+enum FolderPath {
+    static func components(_ path: String) -> [String] { path.split(separator: "/").map(String.init) }
+
+    /// What the folder itself is called.
+    static func name(_ path: String) -> String { components(path).last ?? path }
+
+    /// The folder it's in; nil at the top level.
+    static func parent(_ path: String) -> String? {
+        let above = components(path).dropLast()
+        return above.isEmpty ? nil : above.joined(separator: "/")
+    }
+
+    static func child(_ name: String, of parent: String?) -> String { parent.map { "\($0)/\(name)" } ?? name }
+
+    /// For menus that list every folder, where the name alone could be ambiguous.
+    static func label(_ path: String) -> String { components(path).joined(separator: " › ") }
+
+    /// Whether `path` is `folder` or anywhere inside it.
+    static func contains(_ folder: String, _ path: String) -> Bool { path == folder || path.hasPrefix(folder + "/") }
+}
+
 @Observable @MainActor
 final class CaptureStore {
     private(set) var captures: [CaptureRecord] = []
-    /// Folder names, empty ones included, in Finder order.
+    /// Folder paths, empty folders included, each followed by what's inside it, in Finder order.
     private(set) var folders: [String] = []
 
     nonisolated static let root = URL.documentsDirectory.appending(path: "Captures", directoryHint: .isDirectory)
@@ -121,14 +146,29 @@ final class CaptureStore {
         }
         captures = found.sorted { $0.date > $1.date }
         let saved = (try? Data(contentsOf: Self.foldersURL)).flatMap { try? JSONDecoder().decode([String].self, from: $0) }
-        folders = Self.sorted(Set(saved ?? []).union(found.compactMap(\.folder)))
+        folders = Self.tree((saved ?? []) + found.compactMap(\.folder))
     }
 
+    /// The panoramas directly in `folder`; nil is the top level.
     func captures(in folder: String?) -> [CaptureRecord] { captures.filter { $0.folder == folder } }
+
+    /// The panoramas in `folder` and its subfolders.
+    func captures(within folder: String) -> [CaptureRecord] {
+        captures.filter { $0.folder.map { FolderPath.contains(folder, $0) } ?? false }
+    }
+
+    /// The folders directly in `folder`; nil is the top level.
+    func subfolders(of folder: String?) -> [String] { folders.filter { FolderPath.parent($0) == folder } }
 
     func rename(_ id: UUID, to name: String) {
         guard var record = record(id) else { return }
         record.name = Self.cleaned(name)
+        save(record)
+    }
+
+    func describe(_ id: UUID, as description: String) {
+        guard var record = record(id) else { return }
+        record.description = Self.cleaned(description)
         save(record)
     }
 
@@ -138,43 +178,67 @@ final class CaptureStore {
         save(record)
     }
 
-    /// Adds a folder, or finds the one with that name. Nil for a blank name.
-    @discardableResult func createFolder(_ name: String) -> String? {
-        guard let name = Self.cleaned(name) else { return nil }
-        if !folders.contains(name) { setFolders(folders + [name]) }
-        return name
+    /// Adds a folder inside `parent`, or finds the one with that name there. Returns its path, or
+    /// nil for a blank name.
+    @discardableResult func createFolder(_ name: String, in parent: String? = nil) -> String? {
+        guard let name = Self.folderName(name) else { return nil }
+        let path = FolderPath.child(name, of: parent)
+        if !folders.contains(path) { setFolders(folders + [path]) }
+        return path
     }
 
-    /// Renames a folder, merging it into any folder already called `newName`. Returns the name
-    /// the folder ends up with.
+    /// Renames a folder, merging it into any folder beside it already called `newName`. Returns
+    /// the path the folder ends up with.
     @discardableResult func renameFolder(_ folder: String, to newName: String) -> String {
-        guard let newName = Self.cleaned(newName), newName != folder else { return folder }
-        for var record in captures where record.folder == folder {
-            record.folder = newName
-            save(record)
-        }
-        setFolders(folders.filter { $0 != folder } + [newName])
-        return newName
+        guard let name = Self.folderName(newName) else { return folder }
+        let path = FolderPath.child(name, of: FolderPath.parent(folder))
+        if path != folder { relocate(folder, to: path) }
+        return path
     }
 
-    /// Removes a folder. Its panoramas aren't deleted; they move to the top level.
-    func deleteFolder(_ folder: String) {
-        for var record in captures where record.folder == folder {
-            record.folder = nil
+    /// Removes a folder. What's in it isn't deleted: its panoramas and subfolders move up a level.
+    func deleteFolder(_ folder: String) { relocate(folder, to: FolderPath.parent(folder)) }
+
+    /// Makes everything in `folder` belong to `destination` instead, merging with what's there.
+    private func relocate(_ folder: String, to destination: String?) {
+        func moved(_ path: String) -> String? {
+            guard FolderPath.contains(folder, path) else { return path }
+            return path == folder ? destination : FolderPath.child(String(path.dropFirst(folder.count + 1)), of: destination)
+        }
+        for var record in captures(within: folder) {
+            record.folder = record.folder.flatMap(moved)
             save(record)
         }
-        setFolders(folders.filter { $0 != folder })
+        setFolders(folders.compactMap(moved))
     }
 
-    private func setFolders(_ names: [String]) {
-        folders = Self.sorted(Set(names))
+    private func setFolders(_ paths: [String]) {
+        folders = Self.tree(paths)
         try? FileManager.default.createDirectory(at: Self.foldersURL.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
         if let data = try? JSONEncoder().encode(folders) { try? data.write(to: Self.foldersURL, options: .atomic) }
     }
 
-    private static func sorted(_ names: Set<String>) -> [String] {
-        names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    /// `paths` and the folders above them, each followed by what's inside it, in Finder order.
+    private static func tree(_ paths: [String]) -> [String] {
+        var all = Set<String>()
+        for path in paths {
+            var folder: String? = path
+            while let current = folder {
+                all.insert(current)
+                folder = FolderPath.parent(current)
+            }
+        }
+        return all.sorted { a, b in
+            let (x, y) = (FolderPath.components(a), FolderPath.components(b))
+            if let (p, q) = zip(x, y).first(where: { $0 != $1 }) { return p.localizedStandardCompare(q) == .orderedAscending }
+            return x.count < y.count
+        }
+    }
+
+    /// A slash in a folder's name would read as a level of the path.
+    private static func folderName(_ name: String) -> String? {
+        cleaned(name.replacingOccurrences(of: "/", with: "-"))
     }
 
     private static func cleaned(_ name: String) -> String? {

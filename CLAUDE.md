@@ -149,9 +149,10 @@ Don't drive the phone's UI or send it input. Ask the human to check these and te
   EXIF GPS, compass heading and capture time).
 - `Orb/Viewer/`: `PanoViewer` (MTKView, gestures, gyro) and `Pano.metal` (each pixel becomes a
   ray, then an equirectangular texture lookup; rectilinear ↔ stereographic morph).
-- `Orb/Library/`: `CaptureStore` (`Documents/Captures/<uuid>/capture.json`, names and folders),
-  the library grid, `Folders` (folder screen, rename and move menus), `SharedPanorama` (shares
-  `pano.jpg` under the capture's name), and the detail view (share, save to Photos, re-stitch,
+- `Orb/Library/`: `CaptureStore` (`Documents/Captures/<uuid>/capture.json`, names, descriptions
+  and folders, which nest and are known by their `FolderPath`, like `Trips/Italy`), the library
+  grid, `Folders` (folder screen, rename and move menus), `SharedPanorama` (shares `pano.jpg`
+  under the capture's name), and the detail view (description, share, save to Photos, re-stitch,
   delete).
 
 ### Coordinate conventions (don't change these)
