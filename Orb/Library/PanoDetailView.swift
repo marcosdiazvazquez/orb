@@ -15,6 +15,7 @@ struct PanoDetailView: View {
     @State private var confirmDelete = false
     @State private var alert: String?
     @State private var prompt: NamePrompt?
+    @State private var describing: CaptureRecord?
 
     private var record: CaptureRecord? { store.record(id) }
 
@@ -59,6 +60,7 @@ struct PanoDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { if record?.panorama != nil { bottomBar } }
         .sheet(isPresented: $showInfo) { if let record { InfoSheet(record: record) } }
+        .sheet(item: $describing) { DescriptionEditor(record: $0) }
         .confirmationDialog("Delete this panorama and its shots?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 store.delete(id)
@@ -96,6 +98,7 @@ struct PanoDetailView: View {
                 Button {
                     prompt = NamePrompt(title: "Rename", text: record?.name ?? "") { store.rename(id, to: $0) }
                 } label: { Label("Rename", systemImage: "pencil") }
+                if let record { DescriptionButton(record: record, editing: $describing) }
                 MoveToFolderMenu(id: id, prompt: $prompt)
                 Divider()
                 Button { Task { await saveToPhotos() } } label: { Label("Save to Photos", systemImage: "photo.on.rectangle") }
@@ -138,6 +141,53 @@ struct PanoDetailView: View {
     }
 }
 
+/// Opens the description editor, from a menu.
+struct DescriptionButton: View {
+    let record: CaptureRecord
+    @Binding var editing: CaptureRecord?
+
+    var body: some View {
+        Button { editing = record } label: {
+            Label(record.description == nil ? "Add Description" : "Edit Description", systemImage: "text.alignleft")
+        }
+    }
+}
+
+/// A sheet rather than a `NamePrompt`, because a description runs to several lines.
+struct DescriptionEditor: View {
+    let record: CaptureRecord
+    @State private var text: String
+    @FocusState private var focused: Bool
+    @Environment(CaptureStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    init(record: CaptureRecord) {
+        self.record = record
+        _text = State(initialValue: record.description ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            TextEditor(text: $text)
+                .focused($focused)
+                .padding(.horizontal, 12)
+                .navigationTitle("Description")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            store.describe(record.id, as: text)
+                            dismiss()
+                        }
+                    }
+                }
+                .onAppear { focused = true }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct InfoSheet: View {
     let record: CaptureRecord
     @Environment(\.dismiss) private var dismiss
@@ -145,6 +195,9 @@ private struct InfoSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                if let description = record.description {
+                    Text(description).textSelection(.enabled)
+                }
                 LabeledContent("Captured", value: record.date.formatted(date: .long, time: .shortened))
                 LabeledContent("Shots", value: "\(record.shots.count) of \(record.plannedShots)")
                 LabeledContent("Lens", value: "\(record.lens.label), \(Int((record.longFOV * 180 / .pi).rounded()))°")
